@@ -4,9 +4,31 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+
+/*Builtins commands previsti da Space Monkey Shell*/
+const char* builtins[] = {
+    "cd",
+    "exit",
+    "help"
+};
+
+/*Builtins functions typedef*/
+typedef int (*builtins_type)(char**);
+
 // spm -> Space Monkey 
 char **spm_parse(char*);
-void spm_launch(char** args);
+int spm_execute(char**);
+void spm_launch(char**);
+
+int spm_exit_builtin(char**);
+int spm_cd_builtin(char**);
+
+/*Address dei builtins di sistema*/
+int (*builtins_addr[]) (char**) = {
+    &spm_cd_builtin,
+    &spm_exit_builtin
+};
+
 
 int main(int argc, char *argv[]) {
 
@@ -25,9 +47,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    parsed_commands = spn_parse(line_ptr);
+    parsed_commands = spm_parse(line_ptr);
 
-    spm_launch(parsed_commands);
+    spm_execute(parsed_commands);
+
+    //spm_launch(parsed_commands);
 
 
     /*
@@ -45,6 +69,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
 }
 
+/*Parsing dell'input in stdin*/
 #define TOKENV_SIZE 64
 #define TOKEN_DELIMITER " \t\r\n\a"
 char **spm_parse(char *line) {
@@ -96,6 +121,65 @@ char **spm_parse(char *line) {
     return token_vector;
 }
 
+
+/*Exit builtin*/
+int spm_exit_builtin(char** args) {
+    printf("I'm exiting !!");
+    exit(EXIT_SUCCESS);
+}
+
+/*Change Directory (CD) builtin*/
+int spm_cd_builtin(char** args) {
+
+    printf("Changing directory ... \n");
+    char* cd_target = args[1];
+    
+    char buf[1024];
+    char* wd;
+
+    wd = getcwd(buf, 1024);
+    if(wd == NULL) {
+        perror("Failed getcwd");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("CD FROM %s \n", buf);
+
+    if(chdir(cd_target) == 0) {
+        wd = getcwd(buf, 1024);
+
+        if(wd == NULL) {
+            perror("Failed getcwd \n");
+            exit(EXIT_FAILURE);
+        } 
+        printf("TO %s \n", buf);
+
+    } else {
+        perror("Failed change directory \n");
+        exit(EXIT_FAILURE);
+    }
+
+}
+
+
+int spm_execute(char **args) {
+
+    char* main_command = args[0];
+
+    if(main_command ==  NULL) {
+        return 1;
+    }
+
+    int builtins_num = sizeof(builtins) / sizeof(char *);
+
+    for(int i=0; i<builtins_num; i++) {
+        if(strcmp(main_command, builtins[i]) == 0) {
+            printf("FOUND \n");
+            return (*builtins_addr[i])(args);
+        }
+    }
+}
+
 void spm_launch(char **args) {
 
     __pid_t curr_pid;
@@ -109,23 +193,34 @@ void spm_launch(char **args) {
         exit(EXIT_FAILURE);
         break;
     case 0:
+        puts("I'm the child !! \n");
         char* binary_path = "/bin/cat";
         char* call_args[] = {binary_path, args[0], NULL};
         char *env[] = {NULL};
-        
-        puts("I'm the child !! \n");
 
+        /*
         if(execve(binary_path, call_args, env) == -1) {
             perror("Error in execve");
         }
+        */
 
         exit(EXIT_SUCCESS);
         break;
 
     default:
-       
+
         printf("Child Pid : %jd\n", (__intmax_t) curr_pid);
         puts("Im the parent !!");
+        
+        __pid_t exit_pid;
+        int status;
+        
+        exit_pid = waitpid(curr_pid, &status, WUNTRACED);
+
+        if(exit_pid == -1) {
+            perror("Waitpid error");
+            exit(EXIT_FAILURE);
+        }
         break;
     }
 

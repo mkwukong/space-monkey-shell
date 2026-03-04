@@ -32,41 +32,30 @@ int (*builtins_addr[]) (char**) = {
 
 int main(int argc, char *argv[]) {
 
-    char *line_ptr = NULL;
-    size_t nread;
-    size_t len = 0;
-    char** parsed_commands;
+    while(1) {
+        char *line_ptr = NULL;
+        size_t nread;
+        size_t len = 0;
+        char** parsed_commands;
 
-    printf("$ ");
-    fflush(stdin);
+        printf("$ ");
+        fflush(stdin);
 
-    nread = getline(&line_ptr, &len, stdin);
+        nread = getline(&line_ptr, &len, stdin);
     
-    if(nread == -1) {
-        fprintf(stderr, "Error getting data");
-        exit(EXIT_FAILURE);
+        if(nread == -1) {
+            fprintf(stderr, "Error getting data");
+            exit(EXIT_FAILURE);
+        }
+
+        parsed_commands = spm_parse(line_ptr);
+
+        spm_execute(parsed_commands);
+
+        free(parsed_commands);
+        free(line_ptr);
     }
-
-    parsed_commands = spm_parse(line_ptr);
-
-    spm_execute(parsed_commands);
-
-    //spm_launch(parsed_commands);
-
-
-    /*
-    char* curr = parsed_commands[0];
-    int i = 1;
-    while(curr !=  NULL) {
-        printf("%s \n", curr);
-        curr = parsed_commands[i];
-        i++;
-    }
-    */
-
-    free(parsed_commands);
-    free(line_ptr);
-    exit(EXIT_SUCCESS);
+    //exit(EXIT_SUCCESS);
 }
 
 /*Parsing dell'input in stdin*/
@@ -137,6 +126,8 @@ int spm_cd_builtin(char** args) {
     char buf[1024];
     char* wd;
 
+    /*Print WD and then TD (target directory)*/
+
     wd = getcwd(buf, 1024);
     if(wd == NULL) {
         perror("Failed getcwd");
@@ -180,6 +171,7 @@ int spm_execute(char **args) {
     }
 }
 
+/**/
 void spm_launch(char **args) {
 
     __pid_t curr_pid;
